@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    <title>xFlow Monitoring System</title>
+{% endblock %}
+
+{% block body %}
+<div class="main-content">
+    <div class="header-area">
+        <div class="row align-items-center">
+            <div class="col-md-6 col-sm-8 clearfix">
+                <div class="nav-btn pull-left">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-title-area p-4">
+        <div class="row align-items-center">
+            <div class="col-sm-6">
+                <div class="breadcrumbs-area clearfix">
+                    <h4 class="page-title pull-left">Home</h4>
+                    <ul class="breadcrumbs pull-left">
+                        <li><a>Home</a></li>
+                    </ul>
+                   
+                </div>
+            </div>
+        </div>
+    </div>
+    <br>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-3 single-report p-3 m-2" onclick="location.href='/core_router';" style="cursor: pointer;">
+                <div class="row justify-content-center align-items-center">
+                    <img src="{{ url_for('static', filename='images/router.png') }}" alt="Router">
+                    <h5 class="mt-2 ml-2">Core-Router</h5>
+                </div>
+            </div>
+            <div class="col-3 single-report p-3 m-2" onclick="location.href='/core_switch1';" style="cursor: pointer;">
+                <div class="row justify-content-center align-items-center">
+                    <img src="{{ url_for('static', filename='images/switch.png') }}" alt="Switch">
+                    <h5 class="mt-2 ml-2">Core-Switch-1</h5>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-3 single-report p-3 m-2" onclick="location.href='/core_switch2';" style="cursor: pointer;">
+                <div class="row justify-content-center align-items-center">
+                    <img src="{{ url_for('static', filename='images/switch.png') }}" alt="Switch">
+                    <h5 class="mt-2 ml-2">Core-Switch-2</h5>
+                </div>
+            </div>
+            <div class="col-3 single-report p-3 m-2" onclick="location.href='/access_switch1';" style="cursor: pointer;">
+                <div class="row justify-content-center align-items-center">
+                    <img src="{{ url_for('static', filename='images/switch.png') }}" alt="Switch">
+                    <h5 class="mt-2 ml-2">Access-Switch-1</h5>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-3 single-report p-3 m-2" onclick="location.href='/access_switch2';" style="cursor: pointer;">
+                <div class="row justify-content-center align-items-center">
+                    <img src="{{ url_for('static', filename='images/switch.png') }}" alt="Switch">
+                    <h5 class="mt-2 ml-2">Access-Switch-2</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
