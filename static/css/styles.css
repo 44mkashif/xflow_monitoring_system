@@ -833,10 +833,7 @@ ul.breadcrumbs {
     background: #fff;
     overflow: hidden;
     position: relative;
-}
-
-.s-report-inner {
-    padding-left: 85px;
+    box-shadow: 0 8px 16px -6px black;
 }
 
 .single-report .icon {
@@ -2894,3 +2891,10 @@ table.dataTable thead td {
 }
 
 /*-------------------- END Offset Sidebar ------------------- */
+
+.table {
+  border: 1px solid #bdbdbd !important;
+}
+.table-bordered td, .table-bordered th {
+   border: 1px solid #bdbdbd !important;
+}
