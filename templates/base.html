@@ -16,6 +16,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <script src="{{ url_for('static', filename='js/vendor/modernizr-2.8.3.min.js') }}"></script>
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/chartist.js/latest/chartist.min.css">
+    <script src="//cdn.jsdelivr.net/chartist.js/latest/chartist.min.js"></script>
     {% block head %}{% endblock %}
 </head>
 
@@ -62,16 +64,16 @@
     <script src="{{ url_for('static', filename='js/jquery.slimscroll.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/jquery.slicknav.min.js') }}"></script>
     <!-- start chart js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js"></script>
-    <!-- start highcharts js -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js"></script>
+    <! start highcharts js --
     <script src="https://code.highcharts.com/highcharts.js"></script>
-    <!-- start zingchart js -->
+    <! start zingchart js --
     <script src="https://cdn.zingchart.com/zingchart.min.js"></script>
     <script>
     zingchart.MODULESDIR = "https://cdn.zingchart.com/modules/";
     ZC.LICENSE = ["569d52cefae586f634c54f86dc99e6a9", "ee6b7db5b51705a13dc2339db3edaf6d"];
-    </script>
-    <script src="{{ url_for('static', filename='js/line-chart.js') }}"></script>
+    </script> -->
+    <script src="{{ url_for('static', filename='js/line-chart.js') }}"></script> 
     <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
 </body>
 

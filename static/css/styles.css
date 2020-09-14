@@ -2899,3 +2899,29 @@ table.dataTable thead td {
 .table-bordered td, .table-bordered th {
    border: 1px solid #bdbdbd !important;
 }
+
+.ct-series-a .ct-bar, .ct-series-a .ct-line, .ct-series-a .ct-point, .ct-series-a .ct-slice-donut {
+    stroke: #e47226 !important;
+}
+
+.ct-chart {
+    position: relative;
+}
+
+.ct-axis-label {
+    position: absolute;
+    font-weight: 600;
+    font-size: 16px;
+    color: #565656;
+}
+
+.ct-x-axis-label {
+    bottom: 0;
+    left: 50%;
+}
+
+.ct-y-axis-label {
+    transform: rotate(-90deg);
+    top: 50%;
+    left: -20px;
+}
