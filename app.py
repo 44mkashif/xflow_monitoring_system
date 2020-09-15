@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
@@ -36,6 +36,17 @@ class Login(db.Model):
         self.date       = date
         self.line       = line
         self.device     = device
+
+class Temperature(db.Model):
+    id           = db.Column(db.Integer, primary_key=True)
+    temperature  = db.Column(db.Integer, nullable=False)
+    time         = db.Column(db.DateTime, nullable=False)
+    device       = db.Column(db.String(100), nullable=False)
+
+    def __init__(self, temperature, time, device):
+        self.temperature = temperature
+        self.time        = time
+        self.device      = device
 
 # ************* CORE SWITCH 2 Starts *************
 
@@ -182,7 +193,6 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
                 except:
                     print('There was a problem adding that login attempt')
             
-
 # ************* CORE SWITCH 2 Ends *************
 
 # ************* CORE ROUTER Starts *************
@@ -326,31 +336,58 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
                     print('There was a problem adding that login attempt')
 
 # Fetching Temperatures
-
 import os
 import time
 
 i = 0
 j = 0
 
-temps           = []
-chassis_temps   = []
+temps         = []
+chassis_temps = []
+timelist      = []
+
 with open('/root/Temp_logs.txt','r') as f:
-     for line in f:
-         for word in line.split():
-             chassis_temps.append(word)
+    for line in f:
+        for word in line.split():
+            chassis_temps.append(word)
 
 while j < 20:
     if("Chassis" in chassis_temps[j]):
-      if(chassis_temps[j+1] == "Temperature"):
-        j+=3
-        temps.append(chassis_temps[j])
-        break
+        if(chassis_temps[j+1] == "Temperature"):
+            j+=3
+            temps.append(chassis_temps[j])
+            timelist.append(datetime.now())
+            break
     j+=1
 
 for i in range(0, len(temps)): 
     temps[i] = int(temps[i])
-    print(temps[i])
+
+print(temps)
+print(timelist)
+
+# Adding temperature stats to db
+temp_time = zip(temps, timelist)
+temps_from_db = Temperature.query.filter_by(device='Core-Router').all()
+for (temp, time) in temp_time:
+    if not temps_from_db:
+        new_temp = Temperature(temperature=temp, time=time, device='Core-Router')
+        try:
+            db.session.add(new_temp)
+            db.session.commit()
+
+        except:
+            print('There was a problem adding that temperature stats')
+    else:
+        for temp_from_db in temps_from_db:
+            if(temp_from_db.time != time):
+                new_temp = Temperature(temperature=temp, time=time, device='Core-Router')
+                try:
+                    db.session.add(new_temp)
+                    db.session.commit()
+
+                except:
+                    print('There was a problem adding that temperature stats')
 
 # ************* CORE ROUTER Ends *************
 
@@ -445,6 +482,15 @@ def access_switch2_login():
     return render_template('login_stats.html', logins=logins)
 
 #********************************************
+
+@app.route('/temps')
+def temps():
+    tempslist = []
+    temps_from_db = Temperature.query.filter_by(device='Core-Router').order_by(Temperature.time).all()
+    for temp_from_db in temps_from_db:
+        tempslist.append(temp_from_db.temperature)
+
+    return jsonify({'temperatures': tempslist})
 
 if __name__ == "__main__":
     app.run(debug=True, host='172.30.211.14')
