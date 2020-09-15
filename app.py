@@ -98,15 +98,17 @@ for (port,ip_address,status) in ports_ip_statuses:
 # Fetching Login stats
 import re
 
-ip_adds       = []
-timelist      = []
-datelist      = []
-usernames     = []
+ipaddlist = []
+timelist = []
+datelist = []
+userlist = []
+usernamelist = []
 datetime_list = []
 
 textfile = open('/root/dashboard/filtering/log.txt', 'rt')
 filetext = textfile.read()
 textfile.close()
+
 
 login = re.findall("Login failed \[user: \] \[Source: \d{2,3}.\d{2,3}.\d{2,3}.\d{2,3}\] \[localport: \d{2,3}\] \[Reason: [a-zA-Z0-9- ]*\] at [0-2][0-9]:[0-5][0-9]:[0-5][0-9] UTC \w{3} \w{3} \d{2} \d{4}", filetext)
 mylist = list(dict.fromkeys(login))
@@ -115,10 +117,26 @@ ipadd = re.compile('\d{2,3}.\d{2,3}.\d{2,3}.\d{2,3}')
 
 for i in range(len(mylist)):
     m = ipadd.findall(mylist[i])
-    ip_adds.append(m)
-    usernames.append('Kashif')
+    ipaddlist.append(m)
 
-ip_adds = [item for sublist in ip_adds for item in sublist]
+ipaddlist = [item for sublist in ipaddlist for item in sublist]
+
+user = re.compile('user: [a-zA-Z]*')
+
+for i in range(len(mylist)):
+    m = user.findall(mylist[i])
+    userlist.append(m)
+
+userlist = [item for sublist in userlist for item in sublist]
+
+username = re.compile(' [a-zA-Z]*')
+
+for i in range(len(userlist)):
+    m = username.findall(userlist[i])
+    usernamelist.append(m)
+
+usernamelist = [item for sublist in usernamelist for item in sublist]
+usernamelist = [x.strip(' ') for x in usernamelist]
 
 time = re.compile(' [0-2][0-9]:[0-5][0-9]:[0-5][0-9]')
 
@@ -135,15 +153,13 @@ for i in range(len(mylist)):
     datelist.append(m)
 
 datelist = [item for sublist in datelist for item in sublist]
-
 datetimelist = [i + j for i, j in zip(datelist, timelist)]
-
 for dt in datetimelist:
     datetime_list.append(datetime.strptime(dt, '%a %b %d %Y %H:%M:%S'))
 
 # Adding login stats in DB
 
-user_ip_add_datetime = zip(usernames, ip_adds, datetime_list)
+user_ip_add_datetime = zip(usernamelist, ipaddlist, datetime_list)
 logins_from_db = Login.query.filter_by(device='Core-Switch-2').all()
 
 for (user, ip_add, date_time) in user_ip_add_datetime:
@@ -223,11 +239,11 @@ for (port,ip_address,status) in ports_ip_statuses:
 # Fetching Login stats
 import re
 
-ip_adds       = []
-timelist      = []
-datelist      = []
-usernames     = []
-userlist      = []
+ipaddlist = []
+timelist = []
+datelist = []
+userlist = []
+usernamelist = []
 datetime_list = []
 
 textfile = open('/root/dashboard/filtering/log_router.txt', 'rt')
@@ -241,13 +257,11 @@ ipadd = re.compile('\d{2,3}.\d{2,3}.\d{2,3}.\d{2,3}')
 
 for i in range(len(mylist)):
     m = ipadd.findall(mylist[i])
-    ip_adds.append(m)
-    usernames.append('Kashif')
+    ipaddlist.append(m)
 
-ip_adds = [item for sublist in ip_adds for item in sublist]
+ipaddlist = [item for sublist in ipaddlist for item in sublist]
 
-
-user = re.compile('[a-zA-Z]*')
+user = re.compile('user: [a-zA-Z]*')
 
 for i in range(len(mylist)):
     m = user.findall(mylist[i])
@@ -255,14 +269,23 @@ for i in range(len(mylist)):
 
 userlist = [item for sublist in userlist for item in sublist]
 
+username = re.compile(' [a-zA-Z]*')
+
+for i in range(len(userlist)):
+    m = username.findall(userlist[i])
+    usernamelist.append(m)
+
+usernamelist = [item for sublist in usernamelist for item in sublist]
+usernamelist = [x.strip(' ') for x in usernamelist]
+
 time = re.compile(' [0-2][0-9]:[0-5][0-9]:[0-5][0-9]')
 
 for i in range(len(mylist)):
     m = time.findall(mylist[i])
     timelist.append(m)
 
-timelist = [item for sublist in timelist for item in sublist]
 
+timelist = [item for sublist in timelist for item in sublist]
 
 date = re.compile('\w{3} \w{3} \d{2} \d{4}')
 
@@ -279,7 +302,7 @@ for dt in datetimelist:
 
 # Adding login stats in DB
 
-user_ip_add_datetime = zip(usernames, ip_adds, datetime_list)
+user_ip_add_datetime = zip(usernamelist, ipaddlist, datetime_list)
 logins_from_db = Login.query.filter_by(device='Core-Router').all()
 
 for (user, ip_add, date_time) in user_ip_add_datetime:
@@ -302,6 +325,33 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
                 except:
                     print('There was a problem adding that login attempt')
 
+# Fetching Temperatures
+
+import os
+import time
+
+i = 0
+j = 0
+
+temps           = []
+chassis_temps   = []
+with open('/root/Temp_logs.txt','r') as f:
+     for line in f:
+         for word in line.split():
+             chassis_temps.append(word)
+
+while j < 20:
+    if("Chassis" in chassis_temps[j]):
+      if(chassis_temps[j+1] == "Temperature"):
+        j+=3
+        temps.append(chassis_temps[j])
+        break
+    j+=1
+
+for i in range(0, len(temps)): 
+    temps[i] = int(temps[i])
+    print(temps[i])
+
 # ************* CORE ROUTER Ends *************
 
 @app.route('/')
@@ -313,7 +363,7 @@ def index():
 def core_router():
     interfaces = Interface.query.filter_by(device='Core-Router').all()
     logins = Login.query.filter_by(device='Core-Router').all()
-    return render_template('details.html', interfaces=interfaces, logins=logins)
+    return render_template('details.html', interfaces=interfaces, logins=logins, temps=temps)
 
 @app.route('/core_router/ports_stats')
 def core_router_ports():
