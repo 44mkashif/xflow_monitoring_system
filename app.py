@@ -192,6 +192,56 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
 
                 except:
                     print('There was a problem adding that login attempt')
+
+# Fetching Temperatures
+import os
+import time
+
+i = 0
+j = 0
+temps         = []
+chassis_temps = []
+timelist      = []
+
+with open('/root/Temp_logs.txt','r') as f:
+    for line in f:
+        for word in line.split():
+            chassis_temps.append(word)
+
+while j < len(chassis_temps):
+    if("Chassis" in chassis_temps[j]):
+      if(chassis_temps[j+1] == "Temperature"):
+        j+=3
+        temps.append(chassis_temps[j])
+        timelist.append(datetime.now())
+        break
+    j+=1
+
+for i in range(0, len(temps)): 
+    temps[i] = int(temps[i])
+
+# Adding temperature stats to db
+temp_time = zip(temps, timelist)
+temps_from_db = Temperature.query.filter_by(device='Core-Switch-2').all()
+for (temp, time) in temp_time:
+    if not temps_from_db:
+        new_temp = Temperature(temperature=temp, time=time, device='Core-Switch-2')
+        try:
+            db.session.add(new_temp)
+            db.session.commit()
+
+        except:
+            print('There was a problem adding that temperature stats')
+    else:
+        for temp_from_db in temps_from_db:
+            if(temp_from_db.time != time):
+                new_temp = Temperature(temperature=temp, time=time, device='Core-Switch-2')
+                try:
+                    db.session.add(new_temp)
+                    db.session.commit()
+
+                except:
+                    print('There was a problem adding that temperature stats')
             
 # ************* CORE SWITCH 2 Ends *************
 
@@ -346,25 +396,25 @@ temps         = []
 chassis_temps = []
 timelist      = []
 
-with open('/root/Temp_logs.txt','r') as f:
+with open('/root/Temp_logs_router.txt','r') as f:
     for line in f:
         for word in line.split():
             chassis_temps.append(word)
 
-while j < 20:
-    if("Chassis" in chassis_temps[j]):
-        if(chassis_temps[j+1] == "Temperature"):
-            j+=3
-            temps.append(chassis_temps[j])
-            timelist.append(datetime.now())
-            break
+while j < len(chassis_temps):
+    if("CPU" == chassis_temps[j]):
+      if("temperature" in chassis_temps[j+1]):
+        j+=2
+        temps.append(chassis_temps[j])
+        timelist.append(datetime.now())
+        break
     j+=1
 
 for i in range(0, len(temps)): 
     temps[i] = int(temps[i])
 
-print(temps)
-print(timelist)
+# print(temps)
+# print(timelist)
 
 # Adding temperature stats to db
 temp_time = zip(temps, timelist)
@@ -412,6 +462,16 @@ def core_router_login():
     logins = Login.query.filter_by(device='Core-Router').all()
     return render_template('login_stats.html', logins=logins)
 
+@app.route('/core_router/temps')
+def core_router_temps():
+    tempslist = []
+    temps_from_db = Temperature.query.filter_by(device='Core-Router').order_by(Temperature.time).all()
+    for temp_from_db in temps_from_db:
+        tempslist.append(temp_from_db.temperature)
+
+    return jsonify({'temperatures': tempslist})
+
+
 #************* CORE SWITCH 1 *************
 @app.route('/core_switch1')
 def core_switch1():
@@ -445,6 +505,16 @@ def core_switch2_ports():
 def core_switch2_login():
     logins = Login.query.filter_by(device='Core-Switch-2').all()
     return render_template('login_stats.html', logins=logins)
+
+@app.route('/core_switch2/temps')
+def core_switch2_temps():
+    tempslist = []
+    temps_from_db = Temperature.query.filter_by(device='Core-Switch-2').order_by(Temperature.time).all()
+    for temp_from_db in temps_from_db:
+        tempslist.append(temp_from_db.temperature)
+
+    return jsonify({'temperatures': tempslist})
+
 
 #************* ACCESS SWITCH 1 *************
 
@@ -483,14 +553,6 @@ def access_switch2_login():
 
 #********************************************
 
-@app.route('/temps')
-def temps():
-    tempslist = []
-    temps_from_db = Temperature.query.filter_by(device='Core-Router').order_by(Temperature.time).all()
-    for temp_from_db in temps_from_db:
-        tempslist.append(temp_from_db.temperature)
-
-    return jsonify({'temperatures': tempslist})
-
 if __name__ == "__main__":
     app.run(debug=True, host='172.30.211.14')
+

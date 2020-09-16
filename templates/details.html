@@ -67,7 +67,7 @@
                                 <tr>
                                     <th>Date / Time</th>
                                     <th> User </th>
-                                    <th> Line </th>
+                                    <th> Ip Address </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -80,7 +80,7 @@
                                     <tr>
                                         <td class="bg-light">{{login.date.strftime("%d %b %Y")}}<br>{{login.date.strftime("%I:%M %p")}}</td>
                                         <td class="bg-light">{{login.user}}</td>
-                                        <td class="bg-light">{{login.line}}</td>
+                                        <td class="bg-light">{{login.ip_address}}</td>
                                     </tr>       
                                 {% endfor %}
                             </tbody>

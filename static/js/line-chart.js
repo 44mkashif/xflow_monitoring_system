@@ -1,4 +1,5 @@
-var getTemps = $.get('/temps');
+var getTemps = $.get(window.location.pathname + '/temps');
+
 getTemps.done(function(results) {
   var temperatures = results.temperatures.slice(0,11);
   var data = {
@@ -10,12 +11,20 @@ getTemps.done(function(results) {
     ]
   };
 
+
   var options = {
-    height: 300
+    height: 300,
+    high: Math.max.apply(Math,temperatures) + 5,
+    low: Math.min.apply(Math,temperatures) - 5,
+    onlyInteger: true,
   };
 
   // Create a new line chart object where as first parameter we pass in a selector
   // that is resolving to our chart container element. The Second parameter
   // is the actual data object.
-  var myChart = new Chartist.Line('.ct-chart', data, options);
+  var myChart = new Chartist.Line('.ct-chart', data, options, {
+    axisX : {
+      type: Chartist.AutoScaleAxis,
+    }
+  });
 });
