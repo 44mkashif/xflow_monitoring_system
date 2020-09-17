@@ -50,16 +50,16 @@
                                     <th>Date / Time</th>
                                     <th> Port </th>
                                     <th> Status </th>
-                                    <th> IP Address </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for interface in interfaces %}
                                     <tr>
-                                        <td class="bg-light">11 Sep 2020 10:13 AM</td>
-                                        <td class="bg-light">{{interface.port}}</td>
-                                        <td class="bg-light">{{interface.status}}</td>
-                                        <td class="bg-light">{{interface.ip_address}}</td>
+                                        {% if interface.port|length and interface.status|length %}
+                                            <td class="bg-light">{{interface.date.strftime("%d %b %Y %I:%M %p")}}</td>
+                                            <td class="bg-light">{{interface.port}}</td>
+                                            <td class="bg-light">{{interface.status}}</td>
+                                        {% endif %}
                                     </tr>       
                                 {% endfor %}
                             </tbody>

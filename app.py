@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from celery import Celery
 
 app = Flask(__name__)
 
@@ -12,13 +13,13 @@ db = SQLAlchemy(app)
 class Interface(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     port       = db.Column(db.String(100), nullable=False)
-    ip_address = db.Column(db.String(100), nullable=False)
+    date       = db.Column(db.DateTime, nullable=False)
     status     = db.Column(db.String(100), nullable=False)
     device     = db.Column(db.String(100), nullable=False)
 
-    def __init__(self, port, ip_address, status, device):
+    def __init__(self, port, date, status, device):
         self.port       = port
-        self.ip_address = ip_address
+        self.date = date
         self.status     = status
         self.device     = device
 
@@ -51,63 +52,99 @@ class Temperature(db.Model):
 # ************* CORE SWITCH 2 Starts *************
 
 #Fetching Interfaces stats
-i            = 8
-j            = 0
-interfaces   = []
-ports        = []
-ip_addresses = []
-vlans        = []
-statuses     = []
-with open('/root/switch_int.txt','r') as f:
-    for line in f:
-        for word in line.split():
-            interfaces.append(word)
+import re
 
-while i < 504:
-   if("Vlan" in interfaces[i] ):
-     if("," in interfaces[i+7]):
-       i+=8
-       continue
-     else:
-       i+=7
-       continue
-   ports.append(interfaces[i])
-   i+=1
-   ip_addresses.append(interfaces[i])
-   i+=3
-   if(interfaces[i]=="administratively"):
-     i+=1
-   statuses.append(interfaces[i])
-   i+=3
+datetimelist = []
+intlist = []
+interfaceslist = []
+statlist = []
+statuslist = []
+datetime_list = []
+
+textfile = open('/root/dashboard/filtering/log_switch.txt', 'rt')
+filetext = textfile.read()
+textfile.close()
+
+login = re.findall("\w{3} \d{1,2} [0-2][0-9]:[0-5][0-9]:[0-5][0-9].\d{1,3}: %[a-zA-Z0-9- ]*: Interface [a-zA-Z0-9\/ ]*, changed state to \w{2,4}", filetext)
+mylist = list(dict.fromkeys(login))
+# print(mylist)
+
+dateTime = re.compile('\w{3} \d{1,2} [0-2][0-9]:[0-5][0-9]:[0-5][0-9]')
+
+for i in range(len(mylist)):
+    m = dateTime.findall(mylist[i])
+    datetimelist.append(m)
+
+datetimelist = [item for sublist in datetimelist for item in sublist]
+
+intp = re.compile('Interface [a-zA-Z0-9\/]*')
+
+for i in range(len(mylist)):
+    m = intp.findall(mylist[i])
+    intlist.append(m)
+
+intlist = [item for sublist in intlist for item in sublist]
+
+interfaces = re.compile(' [a-zA-Z0-9\/]*')
+
+for i in range(len(intlist)):
+    m = interfaces.findall(intlist[i])
+    interfaceslist.append(m)
+
+interfaceslist = [item for sublist in interfaceslist for item in sublist]
+interfaceslist = [x.strip(' ') for x in interfaceslist]
+
+stat = re.compile('to \w{2,4}')
+
+for i in range(len(mylist)):
+    m = stat.findall(mylist[i])
+    statlist.append(m)
+
+statlist = [item for sublist in statlist for item in sublist]
+
+status = re.compile(' \w{2,4}')
+
+for i in range(len(statlist)):
+    m = status.findall(statlist[i])
+    statuslist.append(m)
+
+statuslist = [item for sublist in statuslist for item in sublist]
+statuslist = [x.strip(' ') for x in statuslist]
+
+# print(type(datetimelist))
+# print(interfaceslist)
+# print(statuslist)
+
+for dt in datetimelist:
+    datetime_list.append(datetime.strptime(dt, '%b %d %H:%M:%S'))
+
+# print(datetime_list)
 
 # Adding/Updating Interfaces in DB
-ports_ip_statuses = zip(ports, ip_addresses, statuses)
-for (port,ip_address,status) in ports_ip_statuses:
-    interface = Interface.query.filter_by(port=port, device='Core-Switch-2').first()
-    
-    #If interface already exists then update interface else add interface to db
-    if interface != None:
-        if (interface.status != status or interface.port != port or interface.ip_address != ip_address):
-            interface.status     = status
-            interface.ip_address = ip_address
+port_status_datetime = zip(interfaceslist, statuslist, datetime_list)
+interfaces_from_db = Interface.query.filter_by(device='Core-Switch-2').all()
 
-            try:
-                print('Updating')
-                db.session.commit()
-            except:
-                print('There was a problem updating that interface')
-    else:
-        new_interface = Interface(port=port, status=status, ip_address=ip_address, device='Core-Switch-2')
-
+for (port, status, dateTime) in port_status_datetime:
+    if not interfaces_from_db:
+        new_interface = Interface(port=port, status=status, date=dateTime, device='Core-Switch-2')
         try:
             db.session.add(new_interface)
             db.session.commit()
 
         except:
-            print('There was a problem creating that interface')
+            print('There was a problem adding that Interface attempt')
+    else:
+        for interface_from_db in interfaces_from_db:
+            if(interface_from_db.date != dateTime):
+                new_interface = Interface(port=port, status=status, date=dateTime, device='Core-Switch-2')
+                try:
+                    db.session.add(new_interface)
+                    db.session.commit()
+
+                except:
+                    print('There was a problem adding that interface attempt')
 
 # Fetching Login stats
-import re
 
 ipaddlist = []
 timelist = []
@@ -115,6 +152,7 @@ datelist = []
 userlist = []
 usernamelist = []
 datetime_list = []
+datetimelist = []
 
 textfile = open('/root/dashboard/filtering/log.txt', 'rt')
 filetext = textfile.read()
@@ -217,8 +255,9 @@ while j < len(chassis_temps):
         break
     j+=1
 
-for i in range(0, len(temps)): 
-    temps[i] = int(temps[i])
+# print(temps)
+for temp in temps:
+    temp = int(temp)
 
 # Adding temperature stats to db
 temp_time = zip(temps, timelist)
@@ -248,56 +287,101 @@ for (temp, time) in temp_time:
 # ************* CORE ROUTER Starts *************
 
 # Fetching Interfaces Stats
-i            = 8
-j            = 0
-interfaces   = []
-ports        = []
-ip_addresses = []
-statuses     = []
 
-with open('/root/Router.txt','r') as f:
-    for line in f:
-        for word in line.split():
-            interfaces.append(word)
+datetimelist = []
+intlist = []
+interfaceslist = []
+statlist = []
+statuslist = []
+datetime_list = []
 
-while i < 40:
-   ports.append(interfaces[i])
-   i+=1
-   ip_addresses.append(interfaces[i])
-   i+=3
-   if(interfaces[i]=="administratively"):
-     i+=1
-   statuses.append(interfaces[i])
-   i+=3
+textfile = open('/root/dashboard/filtering/log_router.txt', 'rt')
+filetext = textfile.read()
+textfile.close()
+
+login = re.findall("\w{3} \d{1,2} [0-2][0-9]:[0-5][0-9]:[0-5][0-9].\d{1,3}: %[a-zA-Z0-9- ]*: Interface [a-zA-Z0-9\/ ]*, changed state to \w{2,4}", filetext)
+mylist = list(dict.fromkeys(login))
+# print(mylist)
+
+dateTime = re.compile('\w{3} \d{1,2} [0-2][0-9]:[0-5][0-9]:[0-5][0-9]')
+
+for i in range(len(mylist)):
+    m = dateTime.findall(mylist[i])
+    datetimelist.append(m)
+
+datetimelist = [item for sublist in datetimelist for item in sublist]
+
+intp = re.compile('Interface [a-zA-Z0-9\/]*')
+
+for i in range(len(mylist)):
+    m = intp.findall(mylist[i])
+    intlist.append(m)
+
+intlist = [item for sublist in intlist for item in sublist]
+
+interfaces = re.compile(' [a-zA-Z0-9\/]*')
+
+for i in range(len(intlist)):
+    m = interfaces.findall(intlist[i])
+    interfaceslist.append(m)
+
+interfaceslist = [item for sublist in interfaceslist for item in sublist]
+interfaceslist = [x.strip(' ') for x in interfaceslist]
+
+stat = re.compile('to \w{2,4}')
+
+for i in range(len(mylist)):
+    m = stat.findall(mylist[i])
+    statlist.append(m)
+
+statlist = [item for sublist in statlist for item in sublist]
+
+status = re.compile(' \w{2,4}')
+
+for i in range(len(statlist)):
+    m = status.findall(statlist[i])
+    statuslist.append(m)
+
+statuslist = [item for sublist in statuslist for item in sublist]
+statuslist = [x.strip(' ') for x in statuslist]
+
+# print(type(datetimelist))
+# print(interfaceslist)
+# print(statuslist)
+
+for dt in datetimelist:
+    # print(type(dt))
+    datetime_list.append(datetime.strptime(dt, '%b %d %H:%M:%S'))
+
+for dt in datetime_list:
+    dt.replace(year=2020)
+# print(datetime_list)
 
 # Adding/Updating Interfaces in DB
-ports_ip_statuses = zip(ports, ip_addresses, statuses)
-for (port,ip_address,status) in ports_ip_statuses:
-    interface = Interface.query.filter_by(port=port, device='Core-Router').first()
-    
-    #If interface already exists then update interface else add interface to db
-    if interface != None:
-        if (interface.status != status or interface.port != port or interface.ip_address != ip_address):
-            interface.status     = status
-            interface.ip_address = ip_address
+port_status_datetime = zip(interfaceslist, statuslist, datetime_list)
+interfaces_from_db = Interface.query.filter_by(device='Core-Router').all()
 
-            try:
-                print('Updating')
-                db.session.commit()
-            except:
-                print('There was a problem updating that interface')
-    else:
-        new_interface = Interface(port=port, status=status, ip_address=ip_address, device='Core-Router')
-
+for (port, status, dateTime) in port_status_datetime:
+    if not interfaces_from_db:
+        new_interface = Interface(port=port, status=status, date=dateTime, device='Core-Router')
         try:
             db.session.add(new_interface)
             db.session.commit()
 
         except:
-            print('There was a problem creating that interface')
+            print('There was a problem adding that Interface attempt')
+    else:
+        for interface_from_db in interfaces_from_db:
+            if(interface_from_db.port != port and interface_from_db.date != dateTime):
+                new_interface = Interface(port=port, status=status, date=dateTime, device='Core-Router')
+                try:
+                    db.session.add(new_interface)
+                    db.session.commit()
+
+                except:
+                    print('There was a problem adding that interface attempt')
 
 # Fetching Login stats
-import re
 
 ipaddlist = []
 timelist = []
@@ -386,9 +470,6 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
                     print('There was a problem adding that login attempt')
 
 # Fetching Temperatures
-import os
-import time
-
 i = 0
 j = 0
 
@@ -409,11 +490,12 @@ while j < len(chassis_temps):
         timelist.append(datetime.now())
         break
     j+=1
+# print(temps)
 
 for i in range(0, len(temps)): 
     temps[i] = int(temps[i])
 
-# print(temps)
+
 # print(timelist)
 
 # Adding temperature stats to db
@@ -448,13 +530,13 @@ def index():
 #************* CORE ROUTER *************
 @app.route('/core_router')
 def core_router():
-    interfaces = Interface.query.filter_by(device='Core-Router').all()
+    interfaces = Interface.query.filter_by(device='Core-Router').order_by(Interface.date.desc()).all()
     logins = Login.query.filter_by(device='Core-Router').all()
     return render_template('details.html', interfaces=interfaces, logins=logins, temps=temps)
 
 @app.route('/core_router/ports_stats')
 def core_router_ports():
-    interfaces = Interface.query.filter_by(device='Core-Router').all()
+    interfaces = Interface.query.filter_by(device='Core-Router').order_by(Interface.date.desc()).all()
     return render_template('ports_stats.html', interfaces=interfaces)
 
 @app.route('/core_router/login_stats')
@@ -475,13 +557,13 @@ def core_router_temps():
 #************* CORE SWITCH 1 *************
 @app.route('/core_switch1')
 def core_switch1():
-    interfaces = Interface.query.filter_by(device='Core-Switch-1').all()
+    interfaces = Interface.query.filter_by(device='Core-Switch-1').order_by(Interface.date.desc()).all()
     logins = Login.query.filter_by(device='Core-Switch-1').all()
     return render_template('details.html', interfaces=interfaces, logins=logins)
 
 @app.route('/core_switch1/ports_stats')
 def core_switch1_ports():
-    interfaces = Interface.query.filter_by(device='Core-Switch-1').all()
+    interfaces = Interface.query.filter_by(device='Core-Switch-1').order_by(Interface.date.desc()).all()
     return render_template('ports_stats.html', interfaces=interfaces)
 
 @app.route('/core_switch1/login_stats')
@@ -492,13 +574,20 @@ def core_switch1_login():
 #************* CORE SWITCH 2 *************
 @app.route('/core_switch2')
 def core_switch2():
-    interfaces = Interface.query.filter_by(device='Core-Switch-2').all()
+    interfaces = []
+    logins = []
+    interfaces = Interface.query.filter_by(device='Core-Switch-2').order_by(Interface.date.desc()).all()
     logins = Login.query.filter_by(device='Core-Switch-2').all()
+    if len(interfaces) == 0:
+        interfaces.append(Interface(device='Core-Switch-2', port='', status='', date=None))
+
     return render_template('details.html', interfaces=interfaces, logins=logins)
 
 @app.route('/core_switch2/ports_stats')
 def core_switch2_ports():
-    interfaces = Interface.query.filter_by(device='Core-Switch-2').all()
+    interfaces = Interface.query.filter_by(device='Core-Switch-2').order_by(Interface.date.desc()).all()
+    if len(interfaces) == 0:
+        interfaces.append(Interface(device='Core-Switch-2', port='', status='', date=None))
     return render_template('ports_stats.html', interfaces=interfaces)
 
 @app.route('/core_switch2/login_stats')

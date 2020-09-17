@@ -76,13 +76,20 @@
                                     <td class="bg-light">Muhammad Kashif</td>
                                     <td class="bg-light">vty 0</td>
                                 </tr> -->
-                                {% for login in logins[:5] %}
+                                {% if logins|length < 1 %}
                                     <tr>
-                                        <td class="bg-light">{{login.date.strftime("%d %b %Y")}}<br>{{login.date.strftime("%I:%M %p")}}</td>
-                                        <td class="bg-light">{{login.user}}</td>
-                                        <td class="bg-light">{{login.ip_address}}</td>
-                                    </tr>       
-                                {% endfor %}
+                                        <td>None</td>
+                                    </tr>
+
+                                {% else %}
+                                    {% for login in logins[:5] %}
+                                        <tr>
+                                            <td class="bg-light">{{login.date.strftime("%d %b %Y")}}<br>{{login.date.strftime("%I:%M %p")}}</td>
+                                            <td class="bg-light">{{login.user}}</td>
+                                            <td class="bg-light">{{login.ip_address}}</td>
+                                        </tr>       
+                                    {% endfor %}
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
@@ -107,13 +114,22 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for interface in interfaces[:5] %}
+                                {% if logins|length < 1 %}
                                     <tr>
-                                        <td class="bg-light">11 Sep 2020<br>10:13 AM</td>
-                                        <td class="bg-light">{{interface.port}}</td>
-                                        <td class="bg-light">{{interface.status}}</td>
-                                    </tr>       
-                                {% endfor %} 
+                                        <td>None</td>
+                                    </tr>
+
+                                {% else %}
+                                    {% for interface in interfaces[:5] %}
+                                        <tr>
+                                            {% if interface.port|length and interface.status|length %}
+                                                <td class="bg-light">{{interface.date.strftime("%d %b %Y")}}<br>{{interface.date.strftime("%I:%M %p")}}</td>
+                                                <td class="bg-light">{{interface.port}}</td>
+                                                <td class="bg-light">{{interface.status}}</td>
+                                            {% endif %}            
+                                        </tr>       
+                                    {% endfor %} 
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
