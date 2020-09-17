@@ -2,13 +2,35 @@ from flask import Flask, render_template, request, redirect, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from celery import Celery
+import os
+import time
 
 app = Flask(__name__)
 
 app.config['SQLALCHEMY_DATABASE_URI']        = 'mysql+pymysql://root:xflow@123@localhost/xflow_monitoring_system'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['CELERY_BROKER_URL']              = 'redis://localhost:6379/'
+app.config['CELERY_RESULT_BACKEND']          = 'redis://localhost:6379/'
 
-db = SQLAlchemy(app)
+db      = SQLAlchemy(app)
+
+def make_celery(app):
+    celery = Celery(
+        app.import_name,
+        backend=app.config['CELERY_RESULT_BACKEND'],
+        broker=app.config['CELERY_BROKER_URL']
+    )
+    celery.conf.update(app.config)
+
+    class ContextTask(celery.Task):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery.Task = ContextTask
+    return celery
+
+celery  = make_celery(app)
 
 class Interface(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
@@ -213,7 +235,7 @@ logins_from_db = Login.query.filter_by(device='Core-Switch-2').all()
 
 for (user, ip_add, date_time) in user_ip_add_datetime:
     if not logins_from_db:
-        new_login = Login(user = user, date = date_time, ip_address = ip_add, line = 'Vty 0', device='Core-Switch-2')
+        new_login = Login(user = user, date = date_time, ip_address = ip_add, line = '-', device='Core-Switch-2')
         try:
             db.session.add(new_login)
             db.session.commit()
@@ -223,7 +245,7 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
     else:
         for login_from_db in logins_from_db:
             if(login_from_db.user != user and login_from_db.ip_address != ip_add and login_from_db.date != date_time):
-                new_login = Login(user = user, date = date_time, ip_address = ip_add, line = 'Vty 0', device='Core-Switch-2')
+                new_login = Login(user = user, date = date_time, ip_address = ip_add, line = '-', device='Core-Switch-2')
                 try:
                     db.session.add(new_login)
                     db.session.commit()
@@ -232,55 +254,67 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
                     print('There was a problem adding that login attempt')
 
 # Fetching Temperatures
-import os
-import time
 
-i = 0
-j = 0
-temps         = []
-chassis_temps = []
-timelist      = []
+cmd='ansible-playbook /root/Get_Temp_logs.yaml'
+celery = Celery("task", broker="pyamqp://guest@localhost//")
+import time as time1
+@celery.task
+def sleep_asynchronously():
+    timelist=[]
+    temps=[]
+    ti=0
+    while ti < 5:
+        i=0
+        j=0
+        os.system(cmd)
+        chassis_temps=[]
+        with open('/root/Temp_logs.txt','r') as f:
+            for line in f:
+                for word in line.split():
+                    chassis_temps.append(word)
 
-with open('/root/Temp_logs.txt','r') as f:
-    for line in f:
-        for word in line.split():
-            chassis_temps.append(word)
 
-while j < len(chassis_temps):
-    if("Chassis" in chassis_temps[j]):
-      if(chassis_temps[j+1] == "Temperature"):
-        j+=3
-        temps.append(chassis_temps[j])
-        timelist.append(datetime.now())
-        break
-    j+=1
+        while j < len(chassis_temps):
+            if("CPU" == chassis_temps[j]):
+                if("temperature" in chassis_temps[j+1]):
+                    j+=2
+                    # timelist.append(datetime.now())
+                    # temps.append()
+                    print(datetime.now())
+                    print(chassis_temps[j])
 
-# print(temps)
-for temp in temps:
-    temp = int(temp)
+                    # Adding temperature stats to db
+                    # temps_from_db = Temperature.query.filter_by(device='Core-Switch-2').all()
+                    # if not temps_from_db:
+                    new_temp = Temperature(temperature=chassis_temps[j], time=datetime.now(), device='Core-Switch-2')
+                    try:
+                        db.session.add(new_temp)
+                        db.session.commit()
 
-# Adding temperature stats to db
-temp_time = zip(temps, timelist)
-temps_from_db = Temperature.query.filter_by(device='Core-Switch-2').all()
-for (temp, time) in temp_time:
-    if not temps_from_db:
-        new_temp = Temperature(temperature=temp, time=time, device='Core-Switch-2')
-        try:
-            db.session.add(new_temp)
-            db.session.commit()
+                    except:
+                        print('There was a problem adding that temperature stats')
+                    # else:
+                        # for temp_from_db in temps_from_db:
+                        #     if(temp_from_db.temperature != chassis_temps[j] and temp_from_db.time != datetime.now()):
+                        #         new_temp = Temperature(temperature=chassis_temps[j], time=datetime.now(), device='Core-Router')
+                        #         try:
+                        #             db.session.add(new_temp)
+                        #             db.session.commit()
 
-        except:
-            print('There was a problem adding that temperature stats')
-    else:
-        for temp_from_db in temps_from_db:
-            if(temp_from_db.time != time):
-                new_temp = Temperature(temperature=temp, time=time, device='Core-Switch-2')
-                try:
-                    db.session.add(new_temp)
-                    db.session.commit()
+                        #         except:
+                        #             print('There was a problem adding that temperature stats')
+                    break
+            j+=1
+        time1.sleep(30)
+        ti+=1
 
-                except:
-                    print('There was a problem adding that temperature stats')
+    
+print(' ')
+print(' ')
+
+print("Let's begin!")
+sleep_asynchronously.delay()
+print("our app is ended")
             
 # ************* CORE SWITCH 2 Ends *************
 
@@ -451,7 +485,7 @@ logins_from_db = Login.query.filter_by(device='Core-Router').all()
 
 for (user, ip_add, date_time) in user_ip_add_datetime:
     if not logins_from_db:
-        new_login = Login(user = user, date = date_time, ip_address = ip_add, line = 'Vty 0', device='Core-Router')
+        new_login = Login(user = user, date = date_time, ip_address = ip_add, line = '-', device='Core-Router')
         try:
             db.session.add(new_login)
             db.session.commit()
@@ -461,7 +495,7 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
     else:
         for login_from_db in logins_from_db:
             if(login_from_db.user != user and login_from_db.ip_address != ip_add and login_from_db.date != date_time):
-                new_login = Login(user = user, date = date_time, ip_address = ip_add, line = 'Vty 0', device='Core-Router')
+                new_login = Login(user = user, date = date_time, ip_address = ip_add, line = '-', device='Core-Router')
                 try:
                     db.session.add(new_login)
                     db.session.commit()
@@ -470,56 +504,67 @@ for (user, ip_add, date_time) in user_ip_add_datetime:
                     print('There was a problem adding that login attempt')
 
 # Fetching Temperatures
-i = 0
-j = 0
 
-temps         = []
-chassis_temps = []
-timelist      = []
-
-with open('/root/Temp_logs_router.txt','r') as f:
-    for line in f:
-        for word in line.split():
-            chassis_temps.append(word)
-
-while j < len(chassis_temps):
-    if("CPU" == chassis_temps[j]):
-      if("temperature" in chassis_temps[j+1]):
-        j+=2
-        temps.append(chassis_temps[j])
-        timelist.append(datetime.now())
-        break
-    j+=1
-# print(temps)
-
-for i in range(0, len(temps)): 
-    temps[i] = int(temps[i])
+cmd='ansible-playbook /root/Get_Temp_logs_router.yaml'
+celery = Celery("task", broker="pyamqp://guest@localhost//")
+import time as time1
+@celery.task
+def sleep_asynchronously():
+    timelist=[]
+    temps=[]
+    ti=0
+    while ti < 5:
+        i=0
+        j=0
+        os.system(cmd)
+        chassis_temps=[]
+        with open('/root/Temp_logs_router.txt','r') as f:
+            for line in f:
+                for word in line.split():
+                    chassis_temps.append(word)
 
 
-# print(timelist)
+        while j < len(chassis_temps):
+            if("CPU" == chassis_temps[j]):
+                if("temperature" in chassis_temps[j+1]):
+                    j+=2
+                    # timelist.append(datetime.now())
+                    # temps.append()
+                    print(datetime.now())
+                    print(chassis_temps[j])
 
-# Adding temperature stats to db
-temp_time = zip(temps, timelist)
-temps_from_db = Temperature.query.filter_by(device='Core-Router').all()
-for (temp, time) in temp_time:
-    if not temps_from_db:
-        new_temp = Temperature(temperature=temp, time=time, device='Core-Router')
-        try:
-            db.session.add(new_temp)
-            db.session.commit()
+                    # Adding temperature stats to db
+                    # temps_from_db = Temperature.query.filter_by(device='Core-Router').all()
+                    # if not temps_from_db:
+                    new_temp = Temperature(temperature=chassis_temps[j], time=datetime.now(), device='Core-Router')
+                    try:
+                        db.session.add(new_temp)
+                        db.session.commit()
 
-        except:
-            print('There was a problem adding that temperature stats')
-    else:
-        for temp_from_db in temps_from_db:
-            if(temp_from_db.time != time):
-                new_temp = Temperature(temperature=temp, time=time, device='Core-Router')
-                try:
-                    db.session.add(new_temp)
-                    db.session.commit()
+                    except:
+                        print('There was a problem adding that temperature stats')
+                    # else:
+                        # for temp_from_db in temps_from_db:
+                        #     if(temp_from_db.temperature != chassis_temps[j] and temp_from_db.time != datetime.now()):
+                        #         new_temp = Temperature(temperature=chassis_temps[j], time=datetime.now(), device='Core-Router')
+                        #         try:
+                        #             db.session.add(new_temp)
+                        #             db.session.commit()
 
-                except:
-                    print('There was a problem adding that temperature stats')
+                        #         except:
+                        #             print('There was a problem adding that temperature stats')
+                    break
+            j+=1
+        time1.sleep(30)
+        ti+=1
+
+    
+print(' ')
+print(' ')
+
+print("Let's begin!")
+sleep_asynchronously.delay()
+print("our app is ended")
 
 # ************* CORE ROUTER Ends *************
 
@@ -532,7 +577,7 @@ def index():
 def core_router():
     interfaces = Interface.query.filter_by(device='Core-Router').order_by(Interface.date.desc()).all()
     logins = Login.query.filter_by(device='Core-Router').all()
-    return render_template('details.html', interfaces=interfaces, logins=logins, temps=temps)
+    return render_template('details.html', interfaces=interfaces, logins=logins)
 
 @app.route('/core_router/ports_stats')
 def core_router_ports():
@@ -547,11 +592,18 @@ def core_router_login():
 @app.route('/core_router/temps')
 def core_router_temps():
     tempslist = []
-    temps_from_db = Temperature.query.filter_by(device='Core-Router').order_by(Temperature.time).all()
+    timelist  = []
+    temps_from_db = Temperature.query.filter_by(device='Core-Router').order_by(Temperature.time.desc()).all()
     for temp_from_db in temps_from_db:
         tempslist.append(temp_from_db.temperature)
+        timelist.append(temp_from_db.time.strftime("%I:%M %p"))
 
-    return jsonify({'temperatures': tempslist})
+    print(tempslist)
+    print(timelist)
+    return jsonify({
+        'temperatures': tempslist,
+        'time': timelist,
+    })
 
 
 #************* CORE SWITCH 1 *************
@@ -598,11 +650,18 @@ def core_switch2_login():
 @app.route('/core_switch2/temps')
 def core_switch2_temps():
     tempslist = []
-    temps_from_db = Temperature.query.filter_by(device='Core-Switch-2').order_by(Temperature.time).all()
+    timelist  = []
+    temps_from_db = Temperature.query.filter_by(device='Core-Switch-2').order_by(Temperature.time.desc()).all()
     for temp_from_db in temps_from_db:
         tempslist.append(temp_from_db.temperature)
+        timelist.append(temp_from_db.time.strftime("%I:%M %p"))
 
-    return jsonify({'temperatures': tempslist})
+    print(tempslist)
+    print(timelist)
+    return jsonify({
+        'temperatures': tempslist,
+        'time': timelist,
+    })
 
 
 #************* ACCESS SWITCH 1 *************
@@ -644,4 +703,5 @@ def access_switch2_login():
 
 if __name__ == "__main__":
     app.run(debug=True, host='172.30.211.14')
+
 

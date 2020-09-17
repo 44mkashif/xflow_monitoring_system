@@ -2925,3 +2925,7 @@ table.dataTable thead td {
     top: 50%;
     left: -20px;
 }
+
+.ct-label {
+    font-size: 15px !important;
+}

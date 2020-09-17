@@ -1,13 +1,15 @@
 var getTemps = $.get(window.location.pathname + '/temps');
 
 getTemps.done(function(results) {
-  var temperatures = results.temperatures.slice(0,11);
+  var temperatures  = results.temperatures.slice(0,10);
+  var timelist      = results.time.slice(0,10);
+  alert(timelist);
   var data = {
     // A labels array that can contain any sort of values
-    labels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    labels: timelist.reverse(),
     // Our series array that contains series objects or in this case series data arrays
     series: [
-      temperatures
+      temperatures.reverse()
     ]
   };
 
