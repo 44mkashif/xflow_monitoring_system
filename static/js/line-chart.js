@@ -3,7 +3,7 @@ var getTemps = $.get(window.location.pathname + '/temps');
 getTemps.done(function(results) {
   var temperatures  = results.temperatures.slice(0,10);
   var timelist      = results.time.slice(0,10);
-  alert(timelist);
+  // alert(timelist);
   var data = {
     // A labels array that can contain any sort of values
     labels: timelist.reverse(),
